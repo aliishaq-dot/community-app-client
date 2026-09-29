@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PostsFeed } from "@/features/posts/components/PostsFeed";
 import { Loader2, UsersIcon } from "lucide-react";
 
 function getErrorStatus(error: unknown) {
@@ -103,16 +104,7 @@ export function GroupPage() {
         </TabsList>
 
         <TabsContent value="posts">
-          <Card>
-            <CardContent className="flex min-h-40 items-center justify-center text-center">
-              <div>
-                <h2 className="font-medium">Posts are coming soon</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  The group feed will be available in the next phase.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <PostsFeed group={group} members={members} />
         </TabsContent>
 
         <TabsContent value="members">

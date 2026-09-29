@@ -1,9 +1,13 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useGetMyGroupsQuery, useCreateGroupMutation, useJoinGroupMutation } from '@/features/groups/api/groupsApi'
-import { useAuthStore } from '@/app/store/authStore'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  useGetMyGroupsQuery,
+  useCreateGroupMutation,
+  useJoinGroupMutation,
+} from "@/features/groups/api/groupsApi";
+import { useAuthStore } from "@/app/store/authStore";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,78 +16,79 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  UsersIcon,
-  PlusIcon,
-  LogInIcon,
-  Loader2,
-} from 'lucide-react'
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { UsersIcon, PlusIcon, LogInIcon, Loader2 } from "lucide-react";
 
 export function HomePage() {
-  const navigate = useNavigate()
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [joinDialogOpen, setJoinDialogOpen] = useState(false)
-  const [createName, setCreateName] = useState('')
-  const [createDescription, setCreateDescription] = useState('')
-  const [joinCode, setJoinCode] = useState('')
-  const [createError, setCreateError] = useState('')
-  const [joinError, setJoinError] = useState('')
+  const navigate = useNavigate();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [joinError, setJoinError] = useState("");
 
-  const { data: groups, isLoading, error, refetch } = useGetMyGroupsQuery()
-  const [createGroup, { isLoading: isCreating }] = useCreateGroupMutation()
-  const [joinGroup, { isLoading: isJoining }] = useJoinGroupMutation()
+  const { data: groups, isLoading, error, refetch } = useGetMyGroupsQuery();
+  const [createGroup, { isLoading: isCreating }] = useCreateGroupMutation();
+  const [joinGroup, { isLoading: isJoining }] = useJoinGroupMutation();
 
   const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setCreateError('')
+    e.preventDefault();
+    setCreateError("");
     try {
-      await createGroup({ name: createName, description: createDescription }).unwrap()
-      setCreateName('')
-      setCreateDescription('')
-      setCreateDialogOpen(false)
-      refetch()
+      await createGroup({
+        name: createName,
+        description: createDescription,
+      }).unwrap();
+      setCreateName("");
+      setCreateDescription("");
+      setCreateDialogOpen(false);
+      refetch();
     } catch (err: any) {
-      setCreateError(err.data?.message || 'Failed to create group')
+      setCreateError(err.data?.message || "Failed to create group");
     }
-  }
+  };
 
   const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setJoinError('')
+    e.preventDefault();
+    setJoinError("");
     try {
-      const result = await joinGroup({ code: joinCode.toUpperCase() }).unwrap()
-      setJoinCode('')
-      setJoinDialogOpen(false)
-      navigate(`/groups/${result.id}`)
+      const result = await joinGroup({ code: joinCode.toUpperCase() }).unwrap();
+      setJoinCode("");
+      setJoinDialogOpen(false);
+      navigate(`/groups/${result.id}`);
     } catch (err: any) {
       if (err.status === 404) {
-        setJoinError('Invalid invite code')
+        setJoinError("Invalid invite code");
       } else if (err.status === 409) {
-        setJoinError('You are already a member of this group')
+        setJoinError("You are already a member of this group");
       } else {
-        setJoinError(err.data?.message || 'Failed to join group')
+        setJoinError(err.data?.message || "Failed to join group");
       }
     }
-  }
+  };
 
   const getRoleBadge = (role: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      OWNER: 'default',
-      ADMIN: 'secondary',
-      MEMBER: 'outline',
-    }
-    return <Badge variant={variants[role] || 'outline'}>{role}</Badge>
-  }
+    const variants: Record<
+      string,
+      "default" | "secondary" | "destructive" | "outline"
+    > = {
+      OWNER: "default",
+      ADMIN: "secondary",
+      MEMBER: "outline",
+    };
+    return <Badge variant={variants[role] || "outline"}>{role}</Badge>;
+  };
 
   const getCurrentUserMembership = (group: any) => {
-    const userId = useAuthStore.getState().user?.id
-    return group.memberships?.find((m: any) => m.userId === userId)
-  }
+    const userId = useAuthStore.getState().user?.id;
+    return group.memberships?.find((m: any) => m.userId === userId);
+  };
 
   if (isLoading) {
     return (
@@ -93,7 +98,7 @@ export function HomePage() {
           <span className="text-muted-foreground">Loading groups...</span>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -130,7 +135,9 @@ export function HomePage() {
                     id="name"
                     placeholder="My Community"
                     value={createName}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateName(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setCreateName(e.target.value)
+                    }
                     required
                     disabled={isCreating}
                   />
@@ -141,19 +148,24 @@ export function HomePage() {
                     id="description"
                     placeholder="What's this group about?"
                     value={createDescription}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreateDescription(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setCreateDescription(e.target.value)
+                    }
                     disabled={isCreating}
                   />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={isCreating || !createName.trim()}>
+                  <Button
+                    type="submit"
+                    disabled={isCreating || !createName.trim()}
+                  >
                     {isCreating ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating...
                       </>
                     ) : (
-                      'Create Group'
+                      "Create Group"
                     )}
                   </Button>
                 </DialogFooter>
@@ -187,7 +199,9 @@ export function HomePage() {
                     id="code"
                     placeholder="ABC123"
                     value={joinCode}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJoinCode(e.target.value.toUpperCase())}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setJoinCode(e.target.value.toUpperCase())
+                    }
                     required
                     maxLength={10}
                     disabled={isJoining}
@@ -195,14 +209,17 @@ export function HomePage() {
                   />
                 </div>
                 <DialogFooter>
-                  <Button type="submit" disabled={isJoining || !joinCode.trim()}>
+                  <Button
+                    type="submit"
+                    disabled={isJoining || !joinCode.trim()}
+                  >
                     {isJoining ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Joining...
                       </>
                     ) : (
-                      'Join Group'
+                      "Join Group"
                     )}
                   </Button>
                 </DialogFooter>
@@ -214,7 +231,9 @@ export function HomePage() {
 
       {error && (
         <Alert variant="destructive" className="mb-6">
-          <AlertDescription>Failed to load groups. Please try again later.</AlertDescription>
+          <AlertDescription>
+            Failed to load groups. Please try again later.
+          </AlertDescription>
         </Alert>
       )}
 
@@ -241,17 +260,19 @@ export function HomePage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => {
-            const membership = getCurrentUserMembership(group)
+            const membership = getCurrentUserMembership(group);
             return (
-              <Card key={group.id} className="hover:shadow-md transition-shadow">
-                <Link
-                  to={`/groups/${group.id}`}
-                  className="block p-6"
-                >
+              <Card
+                key={group.id}
+                className="hover:shadow-md transition-shadow"
+              >
+                <Link to={`/groups/${group.id}`} className="block p-6">
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-xl font-semibold">{group.name}</h3>
-                      <p className="text-muted-foreground">{group.description || 'No description'}</p>
+                      <p className="text-muted-foreground">
+                        {group.description || "No description"}
+                      </p>
                     </div>
                     {membership && getRoleBadge(membership.role)}
                   </div>
@@ -266,10 +287,10 @@ export function HomePage() {
                   </div>
                 </Link>
               </Card>
-            )
+            );
           })}
         </div>
       )}
     </div>
-  )
+  );
 }
