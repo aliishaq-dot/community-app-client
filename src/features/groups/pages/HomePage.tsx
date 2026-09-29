@@ -189,7 +189,7 @@ export function HomePage() {
                     value={joinCode}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setJoinCode(e.target.value.toUpperCase())}
                     required
-                    maxLength={6}
+                    maxLength={10}
                     disabled={isJoining}
                     className="text-center text-lg tracking-widest font-mono"
                   />
