@@ -36,9 +36,11 @@ import {
   useGetPostsQuery,
   useUpdatePostMutation,
 } from "@/features/posts/api/postsApi";
+import { usePostViewTracker } from "@/features/posts/hooks/usePostViewTracker";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { postsApi } from "@/features/posts/api/postsApi";
 import type { Group, Membership, Post } from "@/lib/types";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 const PAGE_LIMIT = 10;
 
@@ -66,7 +68,9 @@ export function PostsFeed({
   members?: Membership[];
 }) {
   const currentUser = useAuthStore((state) => state.user);
-  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ search: "", page: 1 });
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebouncedValue(searchInput, 400);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -78,7 +82,14 @@ export function PostsFeed({
   const [postToDelete, setPostToDelete] = useState<Post | null>(null);
   const [deleteError, setDeleteError] = useState("");
 
-  const postsArgs = { groupId: group.id, page, limit: PAGE_LIMIT };
+  const page = pagination.search === debouncedSearch ? pagination.page : 1;
+
+  const postsArgs = {
+    groupId: group.id,
+    page,
+    limit: PAGE_LIMIT,
+    search: debouncedSearch || undefined,
+  };
   const {
     data: posts,
     isLoading,
@@ -192,66 +203,101 @@ export function PostsFeed({
 
   return (
     <div className="space-y-4">
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogTrigger>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Post
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create a post</DialogTitle>
-            <DialogDescription>
-              Share something with this group.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            {formError && (
-              <Alert variant="destructive">
-                <AlertDescription>{formError}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="post-title">Title</Label>
-              <Input
-                id="post-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                required
-                disabled={isCreating}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="post-body">Body</Label>
-              <textarea
-                id="post-body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                required
-                disabled={isCreating}
-                rows={4}
-                className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                type="submit"
-                disabled={isCreating || !title.trim() || !body.trim()}
-              >
-                {isCreating ? <Loader2 className="animate-spin" /> : <Plus />}
-                Create Post
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search posts"
+            aria-label="Search posts"
+            className="pr-9 pl-9"
+          />
+          {searchInput && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-1/2 right-1 -translate-y-1/2"
+              onClick={() => setSearchInput("")}
+              aria-label="Clear search"
+            >
+              <X />
+            </Button>
+          )}
+        </div>
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogTrigger>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Post
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create a post</DialogTitle>
+              <DialogDescription>
+                Share something with this group.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreate} className="space-y-4">
+              {formError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="post-title">Title</Label>
+                <Input
+                  id="post-title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                  disabled={isCreating}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="post-body">Body</Label>
+                <textarea
+                  id="post-body"
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  required
+                  disabled={isCreating}
+                  rows={4}
+                  className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="submit"
+                  disabled={isCreating || !title.trim() || !body.trim()}
+                >
+                  {isCreating ? <Loader2 className="animate-spin" /> : <Plus />}
+                  Create Post
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {isFetching && !isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Updating posts...
+        </div>
+      )}
 
       {visiblePosts.length === 0 ? (
         <Card>
           <CardContent className="flex min-h-40 items-center justify-center text-center">
             <div>
-              <h2 className="font-medium">No posts yet</h2>
+              <h2 className="font-medium">
+                {debouncedSearch
+                  ? "No posts match your search"
+                  : "No posts yet"}
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Be the first to start a conversation.
               </p>
@@ -269,6 +315,7 @@ export function PostsFeed({
             <PostCard
               key={post.id}
               post={post}
+              groupId={group.id}
               isAuthor={isAuthor}
               canDelete={canDelete}
               isEditing={editingPostId === post.id}
@@ -294,7 +341,9 @@ export function PostsFeed({
         <Button
           variant="outline"
           className="w-full"
-          onClick={() => setPage((currentPage) => currentPage + 1)}
+          onClick={() =>
+            setPagination({ search: debouncedSearch, page: page + 1 })
+          }
           disabled={isFetching}
         >
           {isFetching && <Loader2 className="animate-spin" />}
@@ -345,6 +394,7 @@ export function PostsFeed({
 
 function PostCard({
   post,
+  groupId,
   isAuthor,
   canDelete,
   isEditing,
@@ -360,6 +410,7 @@ function PostCard({
   onDelete,
 }: {
   post: Post;
+  groupId: string;
   isAuthor: boolean;
   canDelete: boolean;
   isEditing: boolean;
@@ -374,14 +425,17 @@ function PostCard({
   onUpdate: (event: React.FormEvent) => void;
   onDelete: () => void;
 }) {
+  const viewRef = usePostViewTracker(groupId, post.id, post.authorId);
+
   return (
-    <Card>
+    <Card ref={viewRef as React.RefObject<HTMLDivElement>}>
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <CardTitle>{post.title}</CardTitle>
             <CardDescription>
-              {post.author.username} · {formatPostDate(post.createdAt)}
+              {post.author.username} · {formatPostDate(post.createdAt)} ·{" "}
+              {post.viewCount} views
             </CardDescription>
           </div>
           <div className="flex shrink-0 items-center gap-1">

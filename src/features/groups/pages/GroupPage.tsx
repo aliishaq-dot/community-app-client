@@ -94,7 +94,12 @@ export function GroupPage() {
           <CardDescription>
             {group.description || "No description provided."}
           </CardDescription>
-        </CardHeader>
+           {group.joinCode && (
+            <CardDescription className="text-sm text-muted-foreground ml-auto">
+              Join code: <span className="font-mono">{group.joinCode}</span>
+            </CardDescription>
+          )}          
+        </CardHeader>        
       </Card>
 
       <Tabs defaultValue="posts">

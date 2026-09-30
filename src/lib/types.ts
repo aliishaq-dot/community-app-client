@@ -33,6 +33,7 @@ export interface Post {
   body: string;
   authorId: string;
   groupId: string;
+  viewCount: number;
   createdAt: string;
   updatedAt: string;
   author: User;

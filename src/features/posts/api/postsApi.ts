@@ -5,6 +5,7 @@ interface GetPostsArgs {
   groupId: string;
   page: number;
   limit: number;
+  search?: string;
 }
 
 interface PaginatedPostsResponse {
@@ -17,15 +18,15 @@ interface PaginatedPostsResponse {
 export const postsApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getPosts: builder.query<Post[], GetPostsArgs>({
-      query: ({ groupId, page, limit }) => ({
+      query: ({ groupId, page, limit, search }) => ({
         url: `/groups/${groupId}/posts`,
-        params: { page, limit },
+        params: { page, limit, ...(search ? { search } : {}) },
         cache: "no-store",
       }),
       transformResponse: (response: PaginatedPostsResponse | Post[]) =>
         Array.isArray(response) ? response : response.items,
       serializeQueryArgs: ({ endpointName, queryArgs }) =>
-        `${endpointName}-${queryArgs.groupId}`,
+        `${endpointName}-${queryArgs.groupId}-${queryArgs.search ?? ""}`,
       merge: (currentCache, newPosts, { arg }) => {
         if (arg.page === 1) {
           return newPosts;
@@ -42,7 +43,8 @@ export const postsApi = api.injectEndpoints({
         return (
           currentArg?.groupId !== previousArg?.groupId ||
           currentArg?.page !== previousArg?.page ||
-          currentArg?.limit !== previousArg?.limit
+          currentArg?.limit !== previousArg?.limit ||
+          currentArg?.search !== previousArg?.search
         );
       },
       providesTags: (result, _error, { groupId }) => [
@@ -76,6 +78,14 @@ export const postsApi = api.injectEndpoints({
         method: "DELETE",
       }),
     }),
+    recordPostView: builder.mutation<void, { groupId: string; postId: string }>(
+      {
+        query: ({ groupId, postId }) => ({
+          url: `/groups/${groupId}/posts/${postId}/view`,
+          method: "POST",
+        }),
+      },
+    ),
   }),
 });
 
@@ -84,4 +94,5 @@ export const {
   useCreatePostMutation,
   useUpdatePostMutation,
   useDeletePostMutation,
+  useRecordPostViewMutation,
 } = postsApi;
