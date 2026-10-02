@@ -58,3 +58,11 @@ export interface UpdatePostDto {
   title: string;
   body: string;
 }
+
+export interface Room {
+  id: string;
+  title?: string;
+  status: string;
+  host: Pick<User, "id" | "username">;
+  startedAt: string;
+}

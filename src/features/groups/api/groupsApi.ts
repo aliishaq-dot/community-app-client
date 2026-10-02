@@ -38,6 +38,26 @@ export const groupsApi = api.injectEndpoints({
         { type: "Membership", id: groupId },
       ],
     }),
+    regenerateGroupCode: builder.mutation<{ joinCode: string }, string>({
+      query: (groupId) => ({
+        url: `/groups/${groupId}/regenerate-code`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, groupId) => [
+        { type: "Group", id: groupId },
+        { type: "Group", id: "LIST" },
+      ],
+    }),
+    leaveGroup: builder.mutation<void, string>({
+      query: (groupId) => ({
+        url: `/groups/${groupId}/leave`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, groupId) => [
+        { type: "Group", id: groupId },
+        { type: "Group", id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -47,4 +67,6 @@ export const {
   useJoinGroupMutation,
   useGetGroupQuery,
   useGetGroupMembersQuery,
+  useRegenerateGroupCodeMutation,
+  useLeaveGroupMutation,
 } = groupsApi;
