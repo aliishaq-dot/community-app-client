@@ -34,10 +34,30 @@ export interface Post {
   authorId: string;
   groupId: string;
   viewCount: number;
+  likeCount: number;
+  likedByMe: boolean;
+  commentCount: number;
   createdAt: string;
   updatedAt: string;
   author: User;
   group: Group;
+}
+
+export interface Comment {
+  id: string;
+  body: string;
+  authorId: string;
+  postId: string;
+  createdAt: string;
+  updatedAt: string;
+  author: User;
+}
+
+export interface CommentsPage {
+  items: Comment[];
+  page: number;
+  limit: number;
+  total: number;
 }
 
 export interface CreateGroupDto {

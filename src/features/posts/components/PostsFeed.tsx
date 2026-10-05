@@ -32,15 +32,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   useCreatePostMutation,
+  useCreateCommentMutation,
+  useDeleteCommentMutation,
   useDeletePostMutation,
+  useGetCommentsQuery,
   useGetPostsQuery,
+  useToggleLikeMutation,
+  useUpdateCommentMutation,
   useUpdatePostMutation,
 } from "@/features/posts/api/postsApi";
+import type { GetPostsArgs } from "@/features/posts/api/postsApi";
 import { usePostViewTracker } from "@/features/posts/hooks/usePostViewTracker";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { postsApi } from "@/features/posts/api/postsApi";
-import type { Group, Membership, Post } from "@/lib/types";
-import { Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import type { Comment, Group, Membership, Post } from "@/lib/types";
+import {
+  ChevronDown,
+  ChevronUp,
+  Heart,
+  Loader2,
+  MessageCircle,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 
 const PAGE_LIMIT = 10;
 
@@ -58,6 +75,21 @@ function formatPostDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatRelativeDate(value: string) {
+  const elapsedSeconds = Math.round((Date.now() - new Date(value).getTime()) / 1000);
+  if (elapsedSeconds < 60) return "just now";
+  if (elapsedSeconds < 3600) {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+  if (elapsedSeconds < 86400) {
+    const hours = Math.floor(elapsedSeconds / 3600);
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+  const days = Math.floor(elapsedSeconds / 86400);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 export function PostsFeed({
@@ -316,6 +348,7 @@ export function PostsFeed({
               key={post.id}
               post={post}
               groupId={group.id}
+              pageArgs={postsArgs}
               isAuthor={isAuthor}
               canDelete={canDelete}
               isEditing={editingPostId === post.id}
@@ -395,6 +428,7 @@ export function PostsFeed({
 function PostCard({
   post,
   groupId,
+  pageArgs,
   isAuthor,
   canDelete,
   isEditing,
@@ -411,6 +445,7 @@ function PostCard({
 }: {
   post: Post;
   groupId: string;
+  pageArgs: GetPostsArgs;
   isAuthor: boolean;
   canDelete: boolean;
   isEditing: boolean;
@@ -426,6 +461,70 @@ function PostCard({
   onDelete: () => void;
 }) {
   const viewRef = usePostViewTracker(groupId, post.id, post.authorId);
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [commentBody, setCommentBody] = useState("");
+  const [commentPage, setCommentPage] = useState(1);
+  const [commentError, setCommentError] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
+  const [commentToDelete, setCommentToDelete] = useState<Comment | null>(null);
+  const [likePost, { isLoading: isLiking }] = useToggleLikeMutation();
+  const [createComment, { isLoading: isCreatingComment }] =
+    useCreateCommentMutation();
+  const [updateComment, { isLoading: isUpdatingComment }] =
+    useUpdateCommentMutation();
+  const [deleteComment, { isLoading: isDeletingComment }] =
+    useDeleteCommentMutation();
+  const { data: commentsPage, isFetching: areCommentsFetching } =
+    useGetCommentsQuery(
+      { groupId, postId: post.id, page: commentPage, limit: 10 },
+      { skip: !isCommentsOpen },
+    );
+
+  const handleCreateComment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!commentBody.trim()) return;
+    setCommentError("");
+    try {
+      await createComment({ groupId, postId: post.id, body: commentBody.trim() }).unwrap();
+      setCommentBody("");
+    } catch (error) {
+      setCommentError(getErrorMessage(error, "Unable to post comment."));
+    }
+  };
+
+  const handleUpdateComment = async (event: React.FormEvent, commentId: string) => {
+    event.preventDefault();
+    if (!editingCommentBody.trim()) return;
+    setCommentError("");
+    try {
+      await updateComment({
+        groupId,
+        postId: post.id,
+        commentId,
+        body: editingCommentBody.trim(),
+      }).unwrap();
+      setEditingCommentId(null);
+    } catch (error) {
+      setCommentError(getErrorMessage(error, "Unable to update comment."));
+    }
+  };
+
+  const handleDeleteComment = async () => {
+    if (!commentToDelete) return;
+    setCommentError("");
+    try {
+      await deleteComment({
+        groupId,
+        postId: post.id,
+        commentId: commentToDelete.id,
+      }).unwrap();
+      setCommentToDelete(null);
+    } catch (error) {
+      setCommentError(getErrorMessage(error, "Unable to delete comment."));
+    }
+  };
 
   return (
     <Card ref={viewRef as React.RefObject<HTMLDivElement>}>
@@ -503,7 +602,197 @@ function PostCard({
         ) : (
           <p className="whitespace-pre-wrap text-sm leading-6">{post.body}</p>
         )}
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              likePost({ groupId, postId: post.id, pageArgs })
+            }
+            disabled={isLiking}
+            aria-label={post.likedByMe ? "Unlike post" : "Like post"}
+          >
+            <Heart
+              className={post.likedByMe ? "fill-current text-red-500" : ""}
+            />
+            {post.likeCount ?? 0} likes
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setIsCommentsOpen((open) => !open);
+              setCommentError("");
+            }}
+            aria-expanded={isCommentsOpen}
+          >
+            <MessageCircle />
+            {post.commentCount ?? 0} comments
+            {isCommentsOpen ? <ChevronUp /> : <ChevronDown />}
+          </Button>
+        </div>
+        {isCommentsOpen && (
+          <div className="mt-4 space-y-4 border-t pt-4">
+            {commentError && (
+              <Alert variant="destructive">
+                <AlertDescription>{commentError}</AlertDescription>
+              </Alert>
+            )}
+            <form onSubmit={handleCreateComment} className="flex gap-2">
+              <textarea
+                value={commentBody}
+                onChange={(event) => setCommentBody(event.target.value)}
+                placeholder="Write a comment..."
+                rows={2}
+                disabled={isCreatingComment}
+                className="min-w-0 flex-1 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+              />
+              <Button
+                type="submit"
+                className="self-end"
+                disabled={isCreatingComment || !commentBody.trim()}
+              >
+                {isCreatingComment ? <Loader2 className="animate-spin" /> : "Post"}
+              </Button>
+            </form>
+            {areCommentsFetching && !commentsPage && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading comments...
+              </div>
+            )}
+            {commentsPage?.items.map((comment) => {
+              const isCommentAuthor = comment.authorId === currentUserId;
+              const canDeleteComment = isCommentAuthor || canDelete;
+              const isEditingComment = editingCommentId === comment.id;
+
+              return (
+                <div key={comment.id} className="rounded-lg bg-muted/50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{comment.author.username}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatRelativeDate(comment.createdAt)}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      {isCommentAuthor && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => {
+                            setEditingCommentId(comment.id);
+                            setEditingCommentBody(comment.body);
+                          }}
+                          aria-label="Edit comment"
+                        >
+                          <Pencil />
+                        </Button>
+                      )}
+                      {canDeleteComment && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setCommentToDelete(comment)}
+                          aria-label="Delete comment"
+                        >
+                          <Trash2 />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {isEditingComment ? (
+                    <form
+                      onSubmit={(event) => handleUpdateComment(event, comment.id)}
+                      className="mt-2 space-y-2"
+                    >
+                      <textarea
+                        value={editingCommentBody}
+                        onChange={(event) => setEditingCommentBody(event.target.value)}
+                        rows={2}
+                        required
+                        className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingCommentId(null)}
+                          disabled={isUpdatingComment}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={isUpdatingComment || !editingCommentBody.trim()}
+                        >
+                          {isUpdatingComment && <Loader2 className="animate-spin" />}
+                          Save
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                      {comment.body}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+            {commentsPage && commentsPage.items.length === 0 && (
+              <p className="text-sm text-muted-foreground">No comments yet.</p>
+            )}
+            {commentsPage && commentsPage.items.length < commentsPage.total && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCommentPage((page) => page + 1)}
+                disabled={areCommentsFetching}
+              >
+                {areCommentsFetching && <Loader2 className="animate-spin" />}
+                Load more comments
+              </Button>
+            )}
+          </div>
+        )}
       </CardContent>
+      <AlertDialog
+        open={Boolean(commentToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingComment) setCommentToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this comment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The comment will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              render={<Button variant="outline" />}
+              disabled={isDeletingComment}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              render={<Button variant="destructive" />}
+              onClick={handleDeleteComment}
+              disabled={isDeletingComment}
+            >
+              {isDeletingComment && <Loader2 className="animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

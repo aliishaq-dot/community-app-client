@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "@/app/store/authStore";
+import { useAppDispatch } from "@/app/store/hooks";
 import {
   useLeaveGroupMutation,
   useGetGroupMembersQuery,
@@ -29,8 +30,10 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LiveRoomsSection } from "@/features/groups/components/LiveRoomsSection";
+import { postsApi } from "@/features/posts/api/postsApi";
 import { PostsFeed } from "@/features/posts/components/PostsFeed";
-import type { Group, Membership } from "@/lib/types";
+import { getSocket } from "@/lib/socket";
+import type { Group, Membership, Post } from "@/lib/types";
 import {
   Check,
   Copy,
@@ -69,6 +72,59 @@ function getRoleVariant(role: string) {
 
 export function GroupPage() {
   const { groupId } = useParams<{ groupId: string }>();
+  const dispatch = useAppDispatch();
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  useEffect(() => {
+    if (!groupId) return;
+
+    const socket = getSocket();
+    socket?.emit("joinGroup", groupId);
+
+    return () => {
+      socket?.emit("leaveGroup", groupId);
+    };
+  }, [groupId, accessToken]);
+
+  useEffect(() => {
+    if (!groupId) return;
+
+    const socket = getSocket();
+    const rejoin = () => socket?.emit("joinGroup", groupId);
+    socket?.on("connect", rejoin);
+
+    return () => {
+      socket?.off("connect", rejoin);
+    };
+  }, [groupId, accessToken]);
+
+  useEffect(() => {
+    if (!groupId) return;
+
+    const socket = getSocket();
+    const onPostCreated = (post: Post) => {
+      if (post.authorId === currentUserId) return;
+
+      dispatch(
+        postsApi.util.updateQueryData(
+          "getPosts",
+          { groupId, page: 1, limit: 10, search: undefined },
+          (draft) => {
+            if (!draft.some((cachedPost) => cachedPost.id === post.id)) {
+              draft.unshift(post);
+            }
+          },
+        ),
+      );
+    };
+
+    socket?.on("post:created", onPostCreated);
+
+    return () => {
+      socket?.off("post:created", onPostCreated);
+    };
+  }, [groupId, currentUserId, accessToken, dispatch]);
 
   const {
     data: group,

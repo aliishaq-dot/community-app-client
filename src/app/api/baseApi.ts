@@ -54,6 +54,6 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
 export const api = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["User", "Group", "Membership", "Post", "Rooms"],
+  tagTypes: ["User", "Group", "Membership", "Post", "Rooms", "Comments"],
   endpoints: () => ({}),
 });

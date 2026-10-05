@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { connectSocket, disconnectSocket } from "@/lib/socket";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -18,14 +19,18 @@ interface AuthState {
   initialize: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   accessToken: null,
   user: null,
   status: "loading" as AuthStatus,
-  setSession: (accessToken, user) =>
-    set({ accessToken, user, status: "authenticated" }),
-  clear: () =>
-    set({ accessToken: null, user: null, status: "unauthenticated" }),
+  setSession: (accessToken, user) => {
+    connectSocket(accessToken);
+    set({ accessToken, user, status: "authenticated" });
+  },
+  clear: () => {
+    disconnectSocket();
+    set({ accessToken: null, user: null, status: "unauthenticated" });
+  },
   setStatus: (status) => set({ status }),
   initialize: async () => {
     try {
@@ -38,7 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       );
       if (!res.ok) throw new Error("No session");
       const { accessToken, user } = await res.json();
-      set({ accessToken, user, status: "authenticated" });
+      get().setSession(accessToken, user);
     } catch {
       set({ accessToken: null, user: null, status: "unauthenticated" });
     }
