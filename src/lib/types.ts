@@ -60,6 +60,29 @@ export interface CommentsPage {
   total: number;
 }
 
+export interface PostLikedEvent {
+  groupId: string;
+  postId: string;
+  userId: string;
+  liked: boolean;
+  likeCount: number;
+}
+
+export interface CommentCreatedEvent {
+  groupId: string;
+  postId: string;
+  comment: Comment;
+}
+
+export type CommentUpdatedEvent = CommentCreatedEvent;
+
+export interface CommentDeletedEvent {
+  groupId: string;
+  postId: string;
+  commentId: string;
+  commentCount: number;
+}
+
 export interface CreateGroupDto {
   name: string;
   description: string;

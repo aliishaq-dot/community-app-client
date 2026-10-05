@@ -33,7 +33,15 @@ import { LiveRoomsSection } from "@/features/groups/components/LiveRoomsSection"
 import { postsApi } from "@/features/posts/api/postsApi";
 import { PostsFeed } from "@/features/posts/components/PostsFeed";
 import { getSocket } from "@/lib/socket";
-import type { Group, Membership, Post } from "@/lib/types";
+import type {
+  CommentCreatedEvent,
+  CommentDeletedEvent,
+  CommentUpdatedEvent,
+  Group,
+  Membership,
+  Post,
+  PostLikedEvent,
+} from "@/lib/types";
 import {
   Check,
   Copy,
@@ -123,6 +131,108 @@ export function GroupPage() {
 
     return () => {
       socket?.off("post:created", onPostCreated);
+    };
+  }, [groupId, currentUserId, accessToken, dispatch]);
+
+  useEffect(() => {
+    if (!groupId) return;
+
+    const socket = getSocket();
+    const postsArgs = {
+      groupId,
+      page: 1,
+      limit: 10,
+      search: undefined,
+    };
+
+    const updatePost = (postId: string, recipe: (post: Post) => void) => {
+      dispatch(
+        postsApi.util.updateQueryData("getPosts", postsArgs, (draft) => {
+          const post = draft.find((item) => item.id === postId);
+          if (post) recipe(post);
+        }),
+      );
+    };
+
+    const onPostLiked = (event: PostLikedEvent) => {
+      if (event.groupId !== groupId) return;
+      updatePost(event.postId, (post) => {
+        post.likeCount = event.likeCount;
+        if (event.userId === currentUserId) {
+          post.likedByMe = event.liked;
+        }
+      });
+    };
+
+    const onCommentCreated = (event: CommentCreatedEvent) => {
+      if (event.groupId !== groupId) return;
+      updatePost(event.postId, (post) => {
+        post.commentCount = (post.commentCount ?? 0) + 1;
+      });
+      dispatch(
+        postsApi.util.updateQueryData(
+          "getComments",
+          { groupId, postId: event.postId, page: 1, limit: 10 },
+          (draft) => {
+            if (!draft.items.some((comment) => comment.id === event.comment.id)) {
+              draft.items.push(event.comment);
+              draft.total += 1;
+            }
+          },
+        ),
+      );
+    };
+
+    const onCommentUpdated = (event: CommentUpdatedEvent) => {
+      if (event.groupId !== groupId) return;
+      dispatch(
+        postsApi.util.updateQueryData(
+          "getComments",
+          { groupId, postId: event.postId, page: 1, limit: 10 },
+          (draft) => {
+            const comment = draft.items.find(
+              (item) => item.id === event.comment.id,
+            );
+            if (comment) {
+              Object.assign(comment, event.comment);
+            }
+          },
+        ),
+      );
+    };
+
+    const onCommentDeleted = (event: CommentDeletedEvent) => {
+      if (event.groupId !== groupId) return;
+      updatePost(event.postId, (post) => {
+        post.commentCount = event.commentCount;
+      });
+      dispatch(
+        postsApi.util.updateQueryData(
+          "getComments",
+          { groupId, postId: event.postId, page: 1, limit: 10 },
+          (draft) => {
+            const index = draft.items.findIndex(
+              (comment) => comment.id === event.commentId,
+            );
+            if (index !== -1) {
+              draft.items.splice(index, 1);
+              draft.total = Math.max(0, draft.total - 1);
+            }
+          },
+        ),
+      );
+    };
+
+    socket?.on("post:liked", onPostLiked);
+    socket?.on("comment:created", onCommentCreated);
+    socket?.on("comment:updated", onCommentUpdated);
+    socket?.on("comment:deleted", onCommentDeleted);
+
+    return () => {
+      socket?.off("post:liked", onPostLiked);
+      socket?.off("comment:created", onCommentCreated);
+      socket?.off("comment:updated", onCommentUpdated);
+      socket?.off("comment:deleted", onCommentDeleted);
     };
   }, [groupId, currentUserId, accessToken, dispatch]);
 
